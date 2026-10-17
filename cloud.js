@@ -270,7 +270,7 @@
   }
   async function listBackups(){
     if(!authorized||!uid||!sb)throw new Error('請先登入');
-    const {data,error}=await sb.from('wordbook_backup_runs').select('started_at,status,word_count,settings_count,storage_path,storage_bytes,drive_status').eq('owner_id',uid).order('started_at',{ascending:false}).limit(14);
+    const {data,error}=await sb.from('wordbook_backup_runs').select('started_at,status,word_count,settings_count,storage_path,storage_bytes,drive_status,drive_file_id,drive_file_name').eq('owner_id',uid).order('started_at',{ascending:false}).limit(14);
     if(error)throw error;
     return data||[];
   }
