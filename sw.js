@@ -1,5 +1,5 @@
 // Only cache public app assets; NEVER cache Supabase API responses, auth URLs or private words.
-const CACHE='wordbook-public-shell-v3.5';
+const CACHE='wordbook-public-shell-v3.6';
 const PUBLIC_FILES=['./','./index.html','./styles.css','./app.js','./cloud.js','./catalog.js','./audio-pack.js','./site-config.js','./manifest.webmanifest','./icons/icon-192.png','./icons/icon-512.png','./voice-test.html','./assets/voice-test.mp3'];
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(PUBLIC_FILES)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
