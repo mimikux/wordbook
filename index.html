@@ -1,1 +1,58 @@
-<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Wordbook</title><style>body{font:17px/1.75 system-ui;background:#faf8ed;color:#384234;max-width:520px;margin:60px auto;padding:22px}h1{font:normal 56px Georgia,serif;margin:10px 0}a{display:inline-block;padding:15px 20px;border-radius:12px;background:#637a5c;color:white;text-decoration:none}</style></head><body><small>MY LITTLE VOCABULARY</small><h1>Wordbook.</h1><p>網站正在安全部署。私人單字沒有公開上傳。先驗證 Android HTTPS 語音播放，再開通單人登入與資料同步。</p><a href="./voice-test.html">測試 HTTPS 語音 →</a></body></html>
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f8f6ec">
+  <meta name="description" content="簡潔的私人英文單字本，支援左右翻頁、中文修訂、進階說明與多重詞性查詢。">
+  <title>Wordbook｜我的英文單字本</title>
+  <link rel="icon" href="./icons/icon-192.png" type="image/png">
+  <link rel="apple-touch-icon" href="./icons/icon-192.png">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <section id="auth-gate" class="auth-gate" aria-live="polite">
+  <div class="auth-card">
+    <div class="auth-kicker"><span class="brand-dot"></span> MY LITTLE VOCABULARY</div>
+    <h1>Wordbook<span class="period">.</span></h1>
+    <p>你的私人英文單字本</p>
+    <form id="auth-form" autocomplete="on">
+      <label for="auth-email">登入 Email</label>
+      <input type="email" id="auth-email" class="text-input" required placeholder="" autocomplete="email" inputmode="email">
+      <label for="auth-code">一次性啟用碼／裝置登入碼</label><input id="auth-code" class="text-input" inputmode="text" autocomplete="off" autocorrect="off" autocapitalize="characters" maxlength="19" spellcheck="false" required placeholder="例如 XXXXX-XXXXX">
+      <button class="btn btn-primary" id="auth-submit" type="submit">驗證並登入</button>
+    </form>
+    <p class="auth-message" id="auth-message">初次啟用請使用專屬啟用碼；其他裝置可由已登入的 Wordbook 產生一次性登入碼，不需要收 Email。</p>
+    <div class="auth-tools"><a href="./voice-test.html">先測試 HTTPS 朗讀與聲音 ↗</a></div>
+  </div>
+</section>
+<main class="app-shell" id="app" hidden>
+    <header class="app-header">
+      <div class="topline"><span class="brand-dot" aria-hidden="true"></span><span class="eyebrow">MY LITTLE VOCABULARY</span><span class="saved-status" id="saved-status">連線中…</span></div>
+      <div class="title-row">
+        <div><h1>Wordbook<span class="period">.</span></h1><div class="subtitle" id="total-label">我的英文單字本</div></div>
+        <div class="header-actions"><button id="search-btn" class="round-button" type="button" title="搜尋單字" aria-label="搜尋單字"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.4"/><path d="m15.7 15.7 5 5"/></svg></button><button id="add-btn" class="round-button round-primary" type="button" title="新增單字" aria-label="新增單字"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v16M4 12h16"/></svg></button><button id="more-btn" class="round-button" type="button" title="更多功能" aria-label="更多功能"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button></div>
+      </div>
+      <div class="utility-row"><button class="sort-button" id="sort-btn" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v18M3 7l4-4 4 4M17 21V3m-4 14 4 4 4-4"/></svg><span id="sort-label">加入時間 · 最新</span><svg class="chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button><span id="active-filter" class="active-filter" hidden></span><span class="swipe-hint">左右滑動翻頁</span></div>
+    </header>
+    <section class="book-area" aria-label="英文單字本">
+      <div class="paper-back paper-back-one" aria-hidden="true"></div><div class="paper-back paper-back-two" aria-hidden="true"></div>
+      <article class="paper-page" id="paper-page">
+        <div class="paper-titlebar"><span>VOCABULARY NOTES</span><div class="paper-tools"><button id="read-page-btn" class="read-page-btn" type="button" aria-label="朗讀本頁英文單字（美式發音）" aria-pressed="false" title="朗讀本頁英文（美式發音）"><svg class="speech-icon sound-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4Z"/><path d="M16 9a4 4 0 0 1 0 6M18 6a8 8 0 0 1 0 12"/></svg><svg class="speech-icon stop-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/></svg><span id="read-page-label">朗讀</span></button><span class="paper-caption" id="paper-caption">01 — 10</span></div></div>
+        <div class="margin-rule" aria-hidden="true"></div>
+        <div class="word-list" id="word-list"></div>
+      </article>
+    </section>
+    <footer class="book-footer"><button class="page-arrow" id="prev-btn" type="button" aria-label="上一頁"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 4-8 8 8 8"/></svg></button><div class="page-counter"><span id="page-current">01</span><span class="counter-slash">/</span><span id="page-total">01</span><div class="counter-hint" id="page-range">點選單字即可修改</div></div><button class="page-arrow" id="next-btn" type="button" aria-label="下一頁"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 4 8 8-8 8"/></svg></button></footer>
+  </main>
+  <div id="modal-layer" class="modal-layer" hidden></div>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  <script src="./site-config.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.74.0" defer></script>
+  <script src="./catalog.js" defer></script>
+  <script src="./audio-pack.js" defer></script>
+  <script src="./app.js" defer></script>
+  <script src="./cloud.js" defer></script>
+</body>
+</html>

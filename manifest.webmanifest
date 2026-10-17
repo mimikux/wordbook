@@ -1,0 +1,16 @@
+{
+  "id":"./",
+  "name":"Wordbook｜我的英文單字本",
+  "short_name":"Wordbook",
+  "start_url":"./",
+  "scope":"./",
+  "display":"standalone",
+  "theme_color":"#f8f6ec",
+  "background_color":"#f8f6ec",
+  "lang":"zh-Hant",
+  "description":"左右翻頁的私人英／中單字本",
+  "icons":[
+    {"src":"./icons/icon-192.png","sizes":"192x192","type":"image/png","purpose":"any maskable"},
+    {"src":"./icons/icon-512.png","sizes":"512x512","type":"image/png","purpose":"any maskable"}
+  ]
+}
