@@ -741,12 +741,23 @@
       <div class="nav-menu"><button type="button" id="nav-account">帳號與同步 <span>›</span></button><button type="button" id="nav-pos">批次校正詞性 <span>›</span></button><button type="button" id="nav-google">Google 翻譯連線 <span>›</span></button><button type="button" id="nav-audio">HTTPS 語音測試 <span>›</span></button><button type="button" id="nav-import">新增 Google 收藏 CSV <span>›</span></button><button type="button" id="nav-notes">匯入 AI 說明資料包 <span>›</span></button><button type="button" id="nav-tags">管理自訂分類標籤 <span>›</span></button><button type="button" id="nav-export-csv">匯出單字與說明 CSV <span>↓</span></button><button type="button" id="nav-backups">雲端每日備份 <span>›</span></button><button type="button" id="nav-export-json">下載完整 JSON 備份 <span>↓</span></button><button type="button" id="nav-restore">合併／還原 Wordbook 備份 <span>›</span></button></div><p class="field-note">舊資料不會被自動覆寫；未來新增的 AI 截圖說明可用「匯入 AI 說明資料包」合併，不用重新安裝 App。</p>`;
     openSheet('更多功能',body);
     $('#nav-backups').onclick=async()=>{
-      openSheet('雲端每日備份',`<div class="plain-note"><b>每天台灣時間 03:05</b> 自動備份 Wordbook 到私人 Supabase Storage。<p>Travel OS 仍於 03:00 獨立備份。Google Drive 副本尚未啟用；Wordbook 目前只會儲存在 Supabase 私人空間。</p></div><div id="wordbook-backup-list" class="plain-note">正在讀取備份紀錄…</div>`,[{text:'完成',kind:'btn-primary',action:closeSheet}]);
+      openSheet('雲端每日備份',`<div class="plain-note"><b>每天台灣時間 03:05</b> 自動備份 Wordbook 到私人 Supabase Storage。<p>Travel OS 仍於 03:00 獨立備份。Google Drive 雙重備份已啟用：先儲存至 Supabase 私人備份區，再複製至 Travel OS 原有 Google Drive 備份帳號；兩個 App 的檔名不同、排程獨立。</p></div><div id="wordbook-backup-list" class="plain-note">正在讀取備份紀錄…</div>`,[{text:'完成',kind:'btn-primary',action:closeSheet}]);
       const el=$('#wordbook-backup-list');
       try{
         const list=await window.WordbookCloud?.listBackups?.();
         if(!el?.isConnected)return;
-        el.innerHTML=(list||[]).length?(list||[]).map((b,i)=>`<div class="tag-manage-row"><div><b>${esc(new Date(b.started_at).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',hour12:false}))}</b><br><small>${esc(b.status)} · ${Number(b.word_count||0)} 筆 · ${Math.round(Number(b.storage_bytes||0)/1024)} KB</small></div>${b.status==='success'? `<button class="external-copy" type="button" data-backup-download="${i}">下載</button>` : ''}</div>`).join(''):'<p>尚未找到備份紀錄。</p>';
+        el.innerHTML=(list||[]).length?(list||[]).map((b,i)=>{
+          const statusText=b.status==='success'?'雙重備份成功':b.status==='partial'?'部分成功':b.status==='failed'?'備份失敗':'執行中';
+          const storageText=b.storage_path?'Supabase ✓':'Supabase 尚未完成';
+          const driveText=b.drive_status==='success'?'Google Drive ✓':b.drive_status==='failed'?'Google Drive 失敗':'Google Drive 尚未執行';
+          const hasDriveId=/^[A-Za-z0-9_-]{10,110}$/.test(String(b.drive_file_id||''))&&b.drive_status==='success';
+          return `<div class="tag-manage-row"><div><b>${esc(new Date(b.started_at).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',hour12:false}))}</b><br><small>${esc(statusText)} · ${Number(b.word_count||0)} 筆 · ${Math.round(Number(b.storage_bytes||0)/1024)} KB</small><br><small>${esc(storageText)} ｜ ${esc(driveText)}</small></div><div class="backup-links">${b.storage_path?`<button class="external-copy" type="button" data-backup-download="${i}">下載</button>`:''}${hasDriveId?`<button class="external-copy" type="button" data-backup-drive="${i}">Drive ↗</button>`:''}</div></div>`;
+        }).join(''):'<p>尚未找到備份紀錄。</p>';
+        el.querySelectorAll('[data-backup-drive]').forEach(btn=>btn.onclick=()=>{
+          const id=String(list[Number(btn.dataset.backupDrive)]?.drive_file_id||'');
+          if(!/^[A-Za-z0-9_-]{10,110}$/.test(id)){toast('Google Drive 檔案 ID 無效');return;}
+          window.open('https://drive.google.com/file/d/'+encodeURIComponent(id)+'/view','_blank','noopener,noreferrer');
+        });
         el.querySelectorAll('[data-backup-download]').forEach(btn=>btn.onclick=async()=>{
           btn.disabled=true;btn.textContent='準備中…';
           try{const url=await window.WordbookCloud.downloadBackupUrl(list[Number(btn.dataset.backupDownload)].storage_path);window.open(url,'_blank','noopener,noreferrer');toast('已建立備份下載連結');}
