@@ -21,6 +21,7 @@
     localChange,
     syncNow,
     issueDeviceCode,
+    lookupPartOfSpeech,
     signOut
   };
   window.WordbookCloud = cloud;
@@ -264,6 +265,21 @@
       throw new Error(messages[result.error]||result.message||('登入服務暫時無法使用（'+response.status+'）'));
     }
     return result;
+  }
+  async function lookupPartOfSpeech(word){
+    if(!authorized||!sb)throw new Error('請先登入 Wordbook');
+    const {data,error}=await sb.auth.getSession();
+    if(error||!data?.session?.access_token)throw new Error('登入狀態無效');
+    const abort=new AbortController(),timer=setTimeout(()=>abort.abort(),8500);
+    try{
+      const r=await fetch(cfg.supabaseUrl+'/functions/v1/wordbook-pos-lookup',{
+        method:'POST',signal:abort.signal,cache:'no-store',
+        headers:{'Content-Type':'application/json','apikey':cfg.publishableKey,'Authorization':'Bearer '+data.session.access_token},
+        body:JSON.stringify({word})});
+      const body=await r.json().catch(()=>({}));
+      if(!r.ok||body.ok!==true)throw new Error('查詢失敗');
+      return {pos:Array.isArray(body.pos)?body.pos:[],source:body.source};
+    }finally{clearTimeout(timer);}
   }
   async function issueDeviceCode(){
     if(!authorized||!sb)throw new Error('請先登入 Wordbook');
