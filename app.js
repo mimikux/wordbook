@@ -513,9 +513,9 @@
     // Traditional script so every translation seen in the notebook is zh-TW.
     const translations=[...new Set(originals.map(r=>`${r.from?.startsWith('中文')?toTraditionalZh(r.originalSource,word.en):r.originalSource} → ${r.to?.startsWith('中文')?toTraditionalZh(r.originalTarget,word.en):r.originalTarget}（${r.from} → ${r.to}）`))];
     const body=`<form id="word-form" autocomplete="off"><div class="field"><label for="word-en">English</label><input id="word-en" class="text-input" maxlength="140" required value="${esc(word?.en||'')}" placeholder=""></div>
-      <div class="field"><div class="field-heading"><label for="word-zh">中文</label><button type="button" class="lookup-btn" id="google-fetch">取得 Google 中文 ↓</button></div><input id="word-zh" class="text-input" maxlength="260" required value="${esc(word?.zh||'')}" placeholder=""><div class="translation-hint" id="lookup-status"></div><div class="translate-open-row"><a id="google-open" class="external-mini" target="_blank" rel="noopener noreferrer" href="https://translate.google.com/">在 Google 翻譯網頁開啟 ↗</a><button type="button" class="external-copy" id="google-copy">複製英文</button></div></div>
+      <div class="field"><div class="field-heading"><label for="word-zh">中文</label></div><input id="word-zh" class="text-input" maxlength="260" required value="${esc(word?.zh||'')}" placeholder=""><div class="translation-hint" id="lookup-status"></div><div class="translate-open-row"><a id="google-open" class="external-mini" target="_blank" rel="noopener noreferrer" href="https://translate.google.com/">在 Google 翻譯網頁開啟 ↗</a><button type="button" class="external-copy" id="google-copy">複製英文</button></div></div>
       <div class="field"><label for="word-note">進一步說明／解析</label><textarea id="word-note" class="text-area word-note" rows="1" maxlength="3500">${esc(word?.note||'')}</textarea></div>
-      <div class="field"><div class="field-heading"><span class="field-label" style="margin:0">詞性</span><button type="button" class="lookup-btn" id="pos-fetch">字典查詞性 ↓</button></div><div class="tag-cloud pos-list">${posSelect}</div><div class="translation-hint" id="pos-status">${esc(word?.posSource==='dictionaryapi.dev'?'已由線上字典確認':word?.posSource==='manual'?'個人自訂詞性':'離線預填詞性，尚待線上字典校正')}</div></div>
+      <div class="field"><div class="field-heading"><span class="field-label" style="margin:0">詞性</span></div><div class="tag-cloud pos-list">${posSelect}</div><div class="translation-hint" id="pos-status">${esc(word?.posSource==='dictionaryapi.dev'?'已由線上字典確認':word?.posSource==='manual'?'個人自訂詞性':'離線預填詞性，尚待線上字典校正')}</div></div>
       <div class="field"><div class="field-label">標籤</div><div class="tag-cloud">${tags}</div></div>
       ${originals.length?`<details class="source-variants"><summary>Google 原收藏紀錄（${originals.length} 筆）${originals.length>1?' · 含其他譯法':''}</summary><div class="original-list">${translations.map(t=>`<div>${esc(t)}</div>`).join('')}</div><p class="field-note">顯示已統一正體中文；原始 Google 收藏文字仍保留在備份中供核對，不會覆蓋你修改過的中文。</p></details>`:''}
       ${word?`<p class="helper-text">來源：${esc(word.source||'手動新增')} · 加入於 ${esc(new Date(word.createdAt).toLocaleDateString('zh-TW'))}</p>`:''}</form>${word?'<div class="footer-danger"><button type="button" id="word-delete" class="btn btn-danger">刪除此單字</button></div>':''}`;
@@ -531,8 +531,6 @@
     }}],{autofocus:word?'':'#word-en',tall:true});
     // Keep notes as one line by default, even when prefilled. The native
     // textarea resize grip is user-controlled; don't auto-grow on typing.
-    let posEdited=false,lookupPosSource=word?.posSource||'';
-    $$('.tag-chip',$('#modal-layer')).forEach(chip=>chip.addEventListener('change',()=>{chip.classList.toggle('checked',$('input',chip).checked);if(chip.classList.contains('pos-chip'))posEdited=true;}));
     $('#word-form').onsubmit=e=>{e.preventDefault();$('#modal-action-1').click();};
     if(word)$('#word-delete').onclick=()=>{
       if(!confirm(`確定刪除「${word.en}」？`))return;
@@ -540,24 +538,13 @@
       state.words=state.words.filter(w=>w.id!==word.id);persist();closeSheet();render();toast('已刪除單字');
     };
     const enInput=$('#word-en'),zhInput=$('#word-zh'),status=$('#lookup-status'),open=$('#google-open'),posStatus=$('#pos-status');
-    let posTimer=0,posRequested='',posLoading=false;
-    const maybePosLookup=async(force=false)=>{
-      const en=clean(enInput.value);
-      if(!en||(!force&&word)||(!force&&posEdited)||(!force&&!isSingleWord(en)))return;
-      if(posLoading&&posRequested===en)return;
-      posLoading=true;posRequested=en;posStatus.textContent='正在從 Free Dictionary API 查詢詞性…';
-      try{
-        const values=await dictionaryLookup(en);
-        if(clean(enInput.value)!==en)return;
-        if(posEdited&&!force){posStatus.textContent='已保留你手動設定的詞性';return;}
-        if(force&&posEdited&&!confirm('要用線上字典的詞性取代你勾選的結果嗎？'))return;
-        $$('.pos-chip input').forEach(input=>{input.checked=values.includes(input.value);input.closest('.pos-chip').classList.toggle('checked',input.checked);});
-        posEdited=false;lookupPosSource='dictionaryapi.dev';
-        posStatus.textContent='已由 Free Dictionary API 帶入 '+values.join(' / ')+'；若有特殊語意仍可自行調整。';
-      }catch(error){posStatus.textContent=error.code==='NOT_FOUND'?'字典查不到這個詞；片語、專有名詞可自行複選詞性。':`無法查詢詞性：${error.message}，仍可手動設定。`;}
-      finally{posLoading=false;}
-    };
-    $('#pos-fetch').onclick=()=>maybePosLookup(true);
+    let posEdited=false,zhEdited=false,lookupPosSource=word?.posSource||'',autoTimer=0,lookupSerial=0,autoFilledZh='',autoFilledPos=[];
+    const saveBtn=$('#modal-action-1');
+    const busy=on=>{saveBtn.disabled=on;saveBtn.textContent=on?'正在自動查詢…':'儲存單字';};
+    $$('.tag-chip',$('#modal-layer')).forEach(chip=>chip.addEventListener('change',()=>{
+      chip.classList.toggle('checked',$('input',chip).checked);
+      if(chip.classList.contains('pos-chip'))posEdited=true;
+    }));
     // Android Translate app often discards web URL parameters (text/sl/tl).
     // Explicitly request Chrome for the *web* destination instead of letting
     // Android App Links route this URL to the native Translate app.
@@ -594,24 +581,50 @@
       }
       toast(copied?'\u5df2\u8907\u88fd\u82f1\u6587\uff0c\u53ef\u76f4\u63a5\u8cbc\u4e0a':'\u8907\u88fd\u5931\u6557\uff0c\u8acb\u624b\u52d5\u9078\u53d6\u82f1\u6587');
     };
-    let enTimer=0,lastLookup='';
-    const maybeLookup=async (manual=false)=>{
-      const en=clean(enInput.value);
-      if(en.length<2||!/[a-z]/i.test(en))return manual?toast('請先輸入英文單字'):null;
-      if(!manual&&clean(zhInput.value))return;
-      if(!state.translatorUrl){status.textContent='自動帶入需先在「更多 → Google 翻譯連線」完成一次設定；也可點下方開啟 Google 翻譯。';return;}
-      if(!manual&&lastLookup===en)return;
-      const requested=en;lastLookup=en;status.textContent='正在向 Google 翻譯服務查詢…';
-      try{
-        const zh=await googleLookup(en);
-        if(clean(enInput.value)!==requested)return;
-        if(clean(zhInput.value)&&(!manual||!confirm('要用 Google 的結果取代目前中文嗎？'))){status.textContent='已保留你原本的中文翻譯';return;}
-        zhInput.value=zh;status.textContent='已帶入 Google 自動翻譯；可依需要自行修正。';
-      }catch(err){status.textContent=`未能自動取得中文：${err.message}。你仍可手動輸入，或使用 Google 翻譯網頁。`;lastLookup='';}
+    const valid=(id,en)=>id===lookupSerial&&enInput.isConnected&&currentEnglish()===en;
+    const changePos=values=>$$('.pos-chip input').forEach(input=>{
+      input.checked=values.includes(input.value);
+      input.closest('.pos-chip').classList.toggle('checked',input.checked);
+    });
+    const autoLookup=async(id,en)=>{
+      if(!valid(id,en))return;
+      const jobs=[];
+      if(!zhEdited&&!clean(zhInput.value)&&state.translatorUrl){
+        status.textContent='正在取得 Google 中文…';
+        jobs.push(googleLookup(en).then(zh=>{
+          if(!valid(id,en)||zhEdited||clean(zhInput.value))return;
+          zhInput.value=zh;autoFilledZh=zh;status.textContent='已帶入 Google 中文，可自行修改。';
+        }).catch(err=>{if(valid(id,en))status.textContent='中文查詢失敗：'+err.message;}));
+      }
+      if(!posEdited&&!$$('input[name="word-pos"]:checked').length){
+        if(en.includes(' ')){
+          changePos(['phrase']);autoFilledPos=['phrase'];lookupPosSource='phrase-rule';
+          posStatus.textContent='已自動歸類片語，可自行修改。';
+        }else if(window.WordbookCloud?.lookupPartOfSpeech){
+          posStatus.textContent='正在辨識詞性…';
+          jobs.push(window.WordbookCloud.lookupPartOfSpeech(en).then(r=>{
+            if(!valid(id,en)||posEdited)return;
+            const values=posItems(r?.pos||[]);
+            if(values.length){
+              changePos(values);autoFilledPos=values;lookupPosSource=r.source||'dictionary';
+              posStatus.textContent='已自動帶入 '+values.map(x=>POS.find(([k])=>k===x)?.[1]||x).join('、')+'；可自行修改。';
+            }else posStatus.textContent='詞性尚未確認，可自行勾選。';
+          }).catch(()=>{if(valid(id,en))posStatus.textContent='詞性查詢暫時失敗，可自行勾選。';}));
+        }
+      }
+      await Promise.allSettled(jobs);
+      if(valid(id,en))busy(false);
     };
-    enInput.oninput=()=>{setLink();clearTimeout(enTimer);clearTimeout(posTimer);if(!word){if(state.translatorUrl)enTimer=setTimeout(()=>maybeLookup(false),850);posTimer=setTimeout(()=>maybePosLookup(false),950);}};
-    if(!word&&isSingleWord(clean(enInput.value)))posTimer=setTimeout(()=>maybePosLookup(false),850);
-    $('#google-fetch').onclick=()=>maybeLookup(true);
+    zhInput.addEventListener('input',()=>{zhEdited=true;autoFilledZh='';});
+    enInput.oninput=()=>{
+      setLink();clearTimeout(autoTimer);lookupSerial++;
+      if(autoFilledZh&&zhInput.value===autoFilledZh&&!zhEdited){zhInput.value='';autoFilledZh='';}
+      if(autoFilledPos.length&&!posEdited){changePos([]);autoFilledPos=[];lookupPosSource='';}
+      const en=currentEnglish();
+      if(word||en.length<2||!/[a-z]/i.test(en)){busy(false);return;}
+      const id=lookupSerial;busy(true);autoTimer=setTimeout(()=>autoLookup(id,en),650);
+    };
+
   }
   async function dictionaryLookup(en){
     const abort=new AbortController(),timer=setTimeout(()=>abort.abort(),13500);
