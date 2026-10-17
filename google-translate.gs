@@ -21,7 +21,7 @@ function doGet(e) {
   }
 
   try {
-    var bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, en, 'UTF-8');
+    var bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, en, Utilities.Charset.UTF_8);
     var key = 'en-zhTW-' + Utilities.base64EncodeWebSafe(bytes).replace(/=+$/, '');
     var cache = CacheService.getScriptCache();
     var zh = cache.get(key);
