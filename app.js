@@ -119,6 +119,17 @@
     st.appliedDatasets.push(CAT.version);
   }
   let state=blankState(); // DO NOT preload any personal dictionary into public HTML.
+  // Only the page number (not private vocabulary) is stored for this tab.
+  // Restore it after the first authenticated cloud load, never during the
+  // empty pre-login render. Reset this position on explicit sign-out.
+  const PAGE_POSITION_KEY='wordbook-current-page-v3';
+  const readStoredPage=()=>{
+    try{const value=Number(sessionStorage.getItem(PAGE_POSITION_KEY));return Number.isSafeInteger(value)&&value>=0?value:0;}
+    catch(e){return 0;}
+  };
+  const rememberPage=()=>{try{sessionStorage.setItem(PAGE_POSITION_KEY,String(currentPage));}catch(e){}};
+  const forgetPage=()=>{try{sessionStorage.removeItem(PAGE_POSITION_KEY);}catch(e){}};
+  let restorePageOnLogin=true;
   let currentPage=0,touchStart=null,toastTimer=0,savedOk=true,activeSheet='';
   // v2.1.9: Android downloaded HTML often has an opaque content:// origin.
   // Prefer direct WebAudio buffer output over MP3 data: URLs via HTMLAudioElement.
@@ -429,6 +440,7 @@
   function render(direction=''){
     const list=sortedWords(),pages=Math.max(1,Math.ceil(list.length/PAGE_SIZE));
     currentPage=Math.max(0,Math.min(currentPage,pages-1));
+    if(window.WordbookCloud?.isReady)rememberPage();
     const offset=currentPage*PAGE_SIZE,slice=list.slice(offset,offset+PAGE_SIZE);
     // Reading is bound to exactly the visible words, not the next page after
     // a swipe, a search, or a change in sort/filter order.
@@ -449,7 +461,7 @@
     $('#page-current').textContent=String(currentPage+1).padStart(2,'0');
     $('#page-total').textContent=String(pages).padStart(2,'0');
     $('#paper-caption').textContent=slice.length?`${String(offset+1).padStart(2,'0')} — ${String(offset+slice.length).padStart(2,'0')}`:'—';
-    $('#page-range').textContent=state.settings.search?`搜尋「${state.settings.search.slice(0,13)}」`:'點選單字查看說明';
+    $('#page-range').textContent=state.settings.search?'搜尋結果 · 點頁碼跳頁':'點頁碼快速跳頁';
     $('#prev-btn').disabled=currentPage===0;$('#next-btn').disabled=currentPage>=pages-1;
     const filter=$('#active-filter');
     const activeParts=[];
@@ -462,6 +474,24 @@
     if(direction){const page=$('#paper-page');page.classList.remove('flip-next','flip-prev');void page.offsetWidth;page.classList.add(direction==='next'?'flip-next':'flip-prev');}
   }
   function setPage(num){const next=Math.max(0,Math.min(Math.max(0,Math.ceil(sortedWords().length/PAGE_SIZE)-1),num));if(next===currentPage)return;const direction=next>currentPage?'next':'prev';currentPage=next;render(direction);}
+  function pageJumpSheet(){
+    const pages=Math.max(1,Math.ceil(sortedWords().length/PAGE_SIZE));
+    const here=currentPage+1;
+    const body=`<p class="plain-note">目前第 <b>${here}</b> 頁，共 <b>${pages}</b> 頁，每頁最多 ${PAGE_SIZE} 個單字。可直接輸入頁數或拖曳進度條。</p>
+      <div class="field page-jump-number"><label for="jump-page-number">前往第幾頁</label><input id="jump-page-number" class="text-input" type="number" inputmode="numeric" min="1" max="${pages}" step="1" value="${here}" aria-label="目標頁數"></div>
+      <div class="page-jump-slider-row"><span>1</span><input id="jump-page-slider" type="range" min="1" max="${pages}" value="${here}" step="1" aria-label="拖曳選擇頁數" ${pages===1?'disabled':''}><span>${pages}</span></div>
+      <div class="page-jump-shortcuts"><button id="jump-first" type="button">第一頁</button><button id="jump-last" type="button">最後一頁</button></div>`;
+    openSheet('快速跳頁',body,[{text:'取消',kind:'btn-ghost',action:closeSheet},{text:'前往此頁',kind:'btn-primary',action:()=>jump($('#jump-page-number').value)}]);
+    const input=$('#jump-page-number'),slider=$('#jump-page-slider');
+    const clamp=value=>Math.max(1,Math.min(pages,Math.trunc(Number(value)||1)));
+    const jump=value=>{closeSheet();setPage(clamp(value)-1);};
+    slider.oninput=()=>{input.value=slider.value;};
+    input.oninput=()=>{if(input.value&&Number.isFinite(Number(input.value)))slider.value=String(clamp(input.value));};
+    input.onchange=()=>{input.value=String(clamp(input.value));slider.value=input.value;};
+    input.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();jump(input.value);}};
+    $('#jump-first').onclick=()=>jump(1);
+    $('#jump-last').onclick=()=>jump(pages);
+  }
   function toast(message,duration=3600){const el=$('#toast');el.textContent=message;el.hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.hidden=true,duration);}
   function closeSheet(){const el=$('#modal-layer');el.hidden=true;el.innerHTML='';activeSheet='';document.body.style.overflow='';}
   function openSheet(title,body,actions=[],opts={}){
@@ -924,6 +954,7 @@
   }
   window.WordbookBridge=Object.freeze({
     getState:()=>JSON.parse(JSON.stringify(state)),
+    isSheetOpen:()=>!$('#modal-layer').hidden,
     setState:(data)=>{
       stopPageSpeech();
       closeSheet();
@@ -934,10 +965,12 @@
         deletedKeys:Array.isArray(raw.deletedKeys)?raw.deletedKeys.map(norm):[],
         settings:{sort:normalizeSort(raw.settings?.sort),tag:String(raw.settings?.tag||''),pos:POS_GROUPS.some(([k])=>k===raw.settings?.pos)?raw.settings.pos:'',search:''},
         translatorUrl:String(raw.translatorUrl||'')};
-      currentPage=0;render();
+      if(restorePageOnLogin){currentPage=readStoredPage();restorePageOnLogin=false;}
+      // Background cloud refresh preserves the currently visible page.
+      render();
     },
     notify:toast,
-    hide:()=>{if(pageSpeech.active)stopPageSpeech();state=blankState();currentPage=0;render();},
+    hide:()=>{if(pageSpeech.active)stopPageSpeech();state=blankState();currentPage=0;restorePageOnLogin=true;forgetPage();render();},
     setStatus:(message)=>{const el=$('#saved-status');if(el)el.textContent=message;},
     promptImport:()=>{restoreSheet();}
   });
@@ -946,6 +979,7 @@
   window.addEventListener('pagehide',()=>{if(pageSpeech.active)stopPageSpeech();});
   $('#prev-btn').onclick=()=>setPage(currentPage-1);
   $('#next-btn').onclick=()=>setPage(currentPage+1);
+  $('#page-jump-btn').onclick=pageJumpSheet;
   $('#add-btn').onclick=()=>wordEditor();
   $('#search-btn').onclick=searchSheet;
   $('#sort-btn').onclick=sortSheet;

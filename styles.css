@@ -81,3 +81,14 @@
 .device-code-value{font:600 clamp(20px,5vw,28px) ui-monospace,monospace;letter-spacing:2px;color:#49663e;user-select:all;overflow-wrap:anywhere}
 .device-code-result .field-label{text-align:center}
 .device-code-result .field-note{font-size:11px;margin:0 0 4px}
+
+/* v3.3: compact page-jump control in the handwritten notebook footer */
+.page-jump-trigger{appearance:none;-webkit-appearance:none;cursor:pointer;border:0;background:transparent;touch-action:manipulation}
+.page-jump-trigger:hover #page-current{color:#59794f;text-decoration:underline;text-underline-offset:4px}
+.page-jump-trigger:focus-visible{outline:2px solid #63785b;outline-offset:5px;border-radius:8px}
+.page-jump-number .text-input{max-width:160px;font-size:19px;font-variant-numeric:tabular-nums;text-align:center}
+.page-jump-slider-row{display:flex;align-items:center;gap:12px;padding:10px 0 20px;font-size:12px;color:#818d7c;font-variant-numeric:tabular-nums}
+.page-jump-slider-row input{flex:1;min-width:0;width:100%;accent-color:#63785b;cursor:pointer;touch-action:pan-y}
+.page-jump-shortcuts{display:flex;gap:10px;margin-bottom:8px}
+.page-jump-shortcuts button{flex:1;padding:11px 10px;border-radius:9px;border:1px solid #d9dfce;background:#f2f4e9;color:#596e53;font-size:13px;font-weight:600}
+.page-jump-shortcuts button:focus-visible{outline:2px solid #63785b;outline-offset:2px}

@@ -228,11 +228,13 @@
     }finally{syncing=false;}
   }
   async function refreshRemote(){
-    if(!authorized||refreshing||dirty||syncing||!online())return;
+    // Do not replace the dictionary while an edit, a filter, or a jump
+    // dialog is open. In particular, prevent loss of unsaved notes.
+    if(!authorized||refreshing||dirty||syncing||!online()||bridge.isSheetOpen?.())return;
     refreshing=true;
     try{
       const remote=await fetchRemote();
-      if(!dirty&&!syncing){
+      if(!dirty&&!syncing&&!bridge.isSheetOpen?.()){
         const current=normalizedState(bridge.getState());
         const changed=JSON.stringify(remote)!==JSON.stringify(current);
         baseline=safeClone(remote);
