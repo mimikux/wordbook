@@ -22,6 +22,8 @@
     syncNow,
     issueDeviceCode,
     lookupPartOfSpeech,
+    listBackups,
+    downloadBackupUrl,
     signOut
   };
   window.WordbookCloud = cloud;
@@ -265,6 +267,18 @@
       throw new Error(messages[result.error]||result.message||('登入服務暫時無法使用（'+response.status+'）'));
     }
     return result;
+  }
+  async function listBackups(){
+    if(!authorized||!uid||!sb)throw new Error('請先登入');
+    const {data,error}=await sb.from('wordbook_backup_runs').select('started_at,status,word_count,settings_count,storage_path,storage_bytes,drive_status').eq('owner_id',uid).order('started_at',{ascending:false}).limit(14);
+    if(error)throw error;
+    return data||[];
+  }
+  async function downloadBackupUrl(path){
+    if(!authorized||!uid||!sb||typeof path!=='string'||!path.startsWith(uid+'/'))throw new Error('無權下載');
+    const {data,error}=await sb.storage.from('wordbook-backups').createSignedUrl(path,60,{download:path.split('/').pop()});
+    if(error||!data?.signedUrl)throw error||new Error('無法產生下載連結');
+    return data.signedUrl;
   }
   async function lookupPartOfSpeech(word){
     if(!authorized||!sb)throw new Error('請先登入 Wordbook');
