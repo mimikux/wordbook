@@ -900,14 +900,14 @@
       state.tagOrders={...state.tagOrders,[tag]:{...cfg,...(state.tagOrders[tag]||{}),...patch}};
       persist();render();
     };
-    const saveOrder=()=>update({enabled:true,order:$('[data-order-id]',list).map(row=>row.dataset.orderId)});
+    const saveOrder=()=>update({enabled:true,order:$$('[data-order-id]',list).map(row=>row.dataset.orderId)});
     $('#tag-order-enable').onchange=e=>{update({enabled:e.target.checked});};
     $('#tag-order-page-size').onchange=e=>update({pageSize:Number(e.target.value)});
     if($('#tag-order-dates'))$('#tag-order-dates').onchange=e=>update({showDates:e.target.checked});
     list.addEventListener('click',e=>{
       const btn=e.target.closest('[data-move]'),row=btn?.closest('[data-order-id]');
       if(!row)return;
-      const rows=$('[data-order-id]',list),i=rows.indexOf(row),n=i+Number(btn.dataset.move);
+      const rows=$$('[data-order-id]',list),i=rows.indexOf(row),n=i+Number(btn.dataset.move);
       if(n<0||n>=rows.length)return;
       if(n<i)list.insertBefore(row,rows[n]);
       else list.insertBefore(row,rows[n].nextSibling);
