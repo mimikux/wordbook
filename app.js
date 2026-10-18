@@ -704,7 +704,7 @@
     const scrollPosition=$('#modal-layer .sheet-content')?.scrollTop||0;
     const body=`<div class="separator-label">排列方式</div>
       <div class="choice-list">${SORTS.map(([id,label])=>`<button class="choice ${state.settings.sort===id?'selected':''}" data-sort="${id}" type="button"><span class="sort-choice-text">${esc(label)}</span></button>`).join('')}</div>
-      <p class="field-note">CSV 沒有每筆收藏日期；舊收藏依原 CSV 順序排列，新加入的單字才有實際新增時間。</p>
+      <p class="field-note">CSV 沒有每筆收藏日期；舊收藏依原 CSV 順序排列，新加入的單字才有實際新增時間。${activeTagOrder()?'<br><b>目前標籤已啟用獨立自訂排序。</b>':''}</p>
       <div class="separator-label">詞性篩選</div>
       <div class="tag-cloud pos-filter-options" role="group" aria-label="依詞性篩選">
         <button class="tag-chip ${!state.settings.pos?'selected':''}" data-pos-filter="" type="button" aria-pressed="${!state.settings.pos}">全部詞性</button>
@@ -712,12 +712,14 @@
       </div>
       <p class="field-note">片語與未歸類詞性列入「其他」；同一單字有多個詞性時，可在不同詞性篩選中找到。</p>
       <div class="separator-label">標籤篩選</div>
-      <div class="tag-cloud"><button class="tag-chip ${!state.settings.tag?'selected':''}" data-filter="" type="button">全部單字</button>${state.tags.map(t=>`<button class="tag-chip ${state.settings.tag===t?'selected':''}" data-filter="${esc(t)}" type="button">${esc(t)}</button>`).join('')}</div>`;
+      <div class="tag-cloud"><button class="tag-chip ${!state.settings.tag?'selected':''}" data-filter="" type="button">全部單字</button>${state.tags.map(t=>`<button class="tag-chip ${state.settings.tag===t?'selected':''}" data-filter="${esc(t)}" type="button">${esc(t)}</button>`).join('')}</div>
+      ${state.settings.tag?`<button type="button" id="selected-tag-order" class="subtle-link">調整「${esc(state.settings.tag)}」的標籤排序 ↗</button>`:''}`;
     openSheet('排序與篩選',body,[{text:'完成',kind:'btn-primary',action:closeSheet}]);
     $('#modal-layer .sheet-content').scrollTop=scrollPosition;
     $$('[data-sort]',$('#modal-layer')).forEach(b=>b.onclick=()=>{state.settings.sort=b.dataset.sort;currentPage=0;persist();render();sortSheet();});
     $$('[data-pos-filter]',$('#modal-layer')).forEach(b=>b.onclick=()=>{state.settings.pos=b.dataset.posFilter;currentPage=0;persist();render();sortSheet();});
-    $$('[data-filter]',$('#modal-layer')).forEach(b=>b.onclick=()=>{state.settings.tag=b.dataset.filter;currentPage=0;persist();render();sortSheet();});
+    $('[data-filter]',$('#modal-layer')).forEach(b=>b.onclick=()=>{state.settings.tag=b.dataset.filter;currentPage=0;persist();render();sortSheet();});
+    if($('#selected-tag-order'))$('#selected-tag-order').onclick=()=>tagOrderSheet(state.settings.tag);
   }
   function searchSheet(){
     const body=`<div class="field"><label for="search-text">搜尋英文、中文或說明</label><input id="search-text" type="search" class="text-input" value="${esc(state.settings.search||'')}" placeholder="例如 pawn / 被人利用" autocomplete="off"></div><p class="field-note">說明欄平時不顯示，但內容也可以被搜尋到。</p>`;
@@ -862,11 +864,12 @@
     }}]);
   }
   function tagManager(){
-    const content=`<div class="field"><label for="new-tag">新增分類名稱</label><div class="inline-actions"><input id="new-tag" class="text-input" maxlength="24" placeholder="例如：旅遊、商務、片語"><button id="tag-add" class="btn btn-primary" type="button">新增</button></div></div><div class="separator-label">目前分類</div>${state.tags.length?state.tags.map(t=>`<div class="tag-manage-row"><div><b>${esc(t)}</b> <small>· ${state.words.filter(w=>w.tags.includes(t)).length} 個單字</small></div><button class="remove-mini" type="button" data-delete-tag="${esc(t)}">刪除</button></div>`).join(''):'<p class="empty-inline">沒有分類</p>'}<p class="field-note">刪除分類不會刪除單字。</p>`;
+    const content=`<div class="field"><label for="new-tag">新增分類名稱</label><div class="inline-actions"><input id="new-tag" class="text-input" maxlength="24" placeholder="例如：旅遊、商務、片語"><button id="tag-add" class="btn btn-primary" type="button">新增</button></div></div><div class="separator-label">目前分類</div>${state.tags.length?state.tags.map(t=>`<div class="tag-manage-row"><div><b>${esc(t)}</b> <small>· ${state.words.filter(w=>w.tags.includes(t)).length} 個單字${state.tagOrders?.[t]?.enabled?' · 自訂排序':''}</small></div><div class="tag-order-actions"><button class="tag-order-edit" type="button" data-order-tag="${esc(t)}">排序</button><button class="remove-mini" type="button" data-delete-tag="${esc(t)}">刪除</button></div></div>`).join(''):'<p class="empty-inline">沒有分類</p>'}<p class="field-note">刪除分類不會刪除單字。</p>`;
     openSheet('管理分類標籤',content,[{text:'完成',kind:'btn-primary',action:closeSheet}]);
     const add=()=>{const tag=clean($('#new-tag').value);if(!tag)return toast('請輸入分類');if(state.tags.some(t=>norm(t)===norm(tag)))return toast('這個分類已存在');state.tags.push(tag);persist();tagManager();toast('已新增分類');};
     $('#tag-add').onclick=add;$('#new-tag').onkeydown=e=>{if(e.key==='Enter')add();};
-    $$('[data-delete-tag]',$('#modal-layer')).forEach(b=>b.onclick=()=>{const tag=b.dataset.deleteTag;if(!confirm(`刪除分類「${tag}」？單字仍會保留。`))return;state.tags=state.tags.filter(t=>t!==tag);for(const w of state.words)w.tags=w.tags.filter(t=>t!==tag);if(state.settings.tag===tag)state.settings.tag='';persist();render();tagManager();});
+    $('[data-order-tag]',$('#modal-layer')).forEach(b=>b.onclick=()=>tagOrderSheet(b.dataset.orderTag));
+    $('[data-delete-tag]',$('#modal-layer')).forEach(b=>b.onclick=()=>{const tag=b.dataset.deleteTag;if(!confirm(`刪除分類「${tag}」？單字仍會保留。`))return;state.tags=state.tags.filter(t=>t!==tag);for(const w of state.words)w.tags=w.tags.filter(t=>t!==tag);if(state.settings.tag===tag)state.settings.tag='';delete state.tagOrders[tag];persist();render();tagManager();});
   }
   function readCsv(raw){
     const text=String(raw||'').replace(/^\uFEFF/,'');
