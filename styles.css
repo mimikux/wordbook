@@ -113,3 +113,50 @@
 .tag-sort-arrows{display:flex;gap:3px}
 .tag-sort-arrows button{width:26px;height:36px;display:grid;place-items:center;background:#edf0e7;color:#65765f;border:1px solid #e3e9dc;border-radius:7px;font-size:15px;touch-action:manipulation}
 @media(max-width:350px){.word-date{font-size:10px;margin-left:5px}.tag-sort-row{gap:5px;padding:5px}.tag-sort-arrows button{width:25px}}
+
+
+/* v3.10: one-tap search dismissal and navigation to the original word page */
+.active-filter{
+  display:inline-flex;align-items:center;gap:5px;padding:2px 4px 2px 8px;
+  max-width:min(158px,42vw);min-width:0;min-height:30px;flex:0 1 auto;
+  overflow:visible;white-space:nowrap;
+}
+.active-filter[hidden]{display:none}
+.active-filter-text{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.clear-search-btn{
+  flex:0 0 24px;width:24px;height:24px;display:grid;place-items:center;
+  padding:0;border:0;border-radius:6px;background:#d9e2ce;
+  color:#486344;font-size:19px;line-height:1;cursor:pointer;touch-action:manipulation
+}
+.clear-search-btn[hidden]{display:none}
+.clear-search-btn:focus-visible,.search-result-goto:focus-visible,.search-quick-item:focus-visible{
+  outline:2px solid #64865b;outline-offset:2px
+}
+.search-result-wrap{position:relative;min-height:0;border-bottom:1px solid var(--line)}
+.search-result-wrap .word-row{height:100%;border-bottom:0;padding-right:79px}
+.search-result-goto{
+  position:absolute;top:50%;right:6px;transform:translateY(-50%);
+  min-width:64px;min-height:34px;padding:5px 6px;
+  background:#ecf1e8;border:1px solid #dce5d5;border-radius:7px;
+  color:#617858;font-size:11px;white-space:nowrap;touch-action:manipulation
+}
+.word-row.word-jump-highlight{background:#eff4df;box-shadow:inset 3px 0 0 #8aa477}
+.search-quick-results{display:flex;flex-direction:column;gap:5px;margin:8px 0 12px}
+.search-quick-count{font-size:11px;color:#899381;padding:2px 0 4px}
+.search-quick-empty{font-size:12px;color:#929b8c;margin:3px 0 11px}
+.search-quick-item{
+  border:1px solid #e4e8dc;border-radius:9px;background:#f8f8f1;
+  padding:10px 11px;min-height:54px;display:flex;align-items:center;
+  justify-content:space-between;gap:9px;width:100%;text-align:left;color:#334034
+}
+.search-quick-item:active{background:#eaf0e4}
+.search-quick-word{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.search-quick-word strong{font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.search-quick-word small{font-size:11px;color:#878f83;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.search-quick-page{font-size:11px;white-space:nowrap;color:#607659;flex:none}
+@media(max-width:370px){
+  .utility-row{gap:6px}
+  .active-filter{max-width:min(125px,36vw)}
+  .search-result-wrap .word-row{padding-right:71px}
+  .search-result-goto{min-width:59px;padding:4px}
+}
