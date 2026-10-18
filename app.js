@@ -924,7 +924,7 @@
       const handle=e.target.closest('.tag-drag-handle'),target=handle?.closest('[data-order-id]');
       if(!target||e.button!==0||row)return;
       row=target;startY=e.clientY;
-      try{handle.setPointerCapture(e.pointerId);}catch(_){}
+      try{list.setPointerCapture(e.pointerId);}catch(_){}
       timer=setTimeout(()=>{
         if(!row)return;
         dragging=true;row.classList.add('is-dragging');
