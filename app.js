@@ -718,7 +718,7 @@
     $('#modal-layer .sheet-content').scrollTop=scrollPosition;
     $$('[data-sort]',$('#modal-layer')).forEach(b=>b.onclick=()=>{state.settings.sort=b.dataset.sort;currentPage=0;persist();render();sortSheet();});
     $$('[data-pos-filter]',$('#modal-layer')).forEach(b=>b.onclick=()=>{state.settings.pos=b.dataset.posFilter;currentPage=0;persist();render();sortSheet();});
-    $('[data-filter]',$('#modal-layer')).forEach(b=>b.onclick=()=>{state.settings.tag=b.dataset.filter;currentPage=0;persist();render();sortSheet();});
+    $$('[data-filter]',$('#modal-layer')).forEach(b=>b.onclick=()=>{state.settings.tag=b.dataset.filter;currentPage=0;persist();render();sortSheet();});
     if($('#selected-tag-order'))$('#selected-tag-order').onclick=()=>tagOrderSheet(state.settings.tag);
   }
   function searchSheet(){
@@ -966,8 +966,8 @@
     openSheet('管理分類標籤',content,[{text:'完成',kind:'btn-primary',action:closeSheet}]);
     const add=()=>{const tag=clean($('#new-tag').value);if(!tag)return toast('請輸入分類');if(state.tags.some(t=>norm(t)===norm(tag)))return toast('這個分類已存在');state.tags.push(tag);persist();tagManager();toast('已新增分類');};
     $('#tag-add').onclick=add;$('#new-tag').onkeydown=e=>{if(e.key==='Enter')add();};
-    $('[data-order-tag]',$('#modal-layer')).forEach(b=>b.onclick=()=>tagOrderSheet(b.dataset.orderTag));
-    $('[data-delete-tag]',$('#modal-layer')).forEach(b=>b.onclick=()=>{const tag=b.dataset.deleteTag;if(!confirm(`刪除分類「${tag}」？單字仍會保留。`))return;state.tags=state.tags.filter(t=>t!==tag);for(const w of state.words)w.tags=w.tags.filter(t=>t!==tag);if(state.settings.tag===tag)state.settings.tag='';delete state.tagOrders[tag];persist();render();tagManager();});
+    $$('[data-order-tag]',$('#modal-layer')).forEach(b=>b.onclick=()=>tagOrderSheet(b.dataset.orderTag));
+    $$('[data-delete-tag]',$('#modal-layer')).forEach(b=>b.onclick=()=>{const tag=b.dataset.deleteTag;if(!confirm(`刪除分類「${tag}」？單字仍會保留。`))return;state.tags=state.tags.filter(t=>t!==tag);for(const w of state.words)w.tags=w.tags.filter(t=>t!==tag);if(state.settings.tag===tag)state.settings.tag='';delete state.tagOrders[tag];persist();render();tagManager();});
   }
   function readCsv(raw){
     const text=String(raw||'').replace(/^\uFEFF/,'');
