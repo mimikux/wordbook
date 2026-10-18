@@ -10,7 +10,7 @@
   const form = document.getElementById('auth-form');
   const submit = document.getElementById('auth-submit');
   const safeClone = x => JSON.parse(JSON.stringify(x));
-  const initial = () => ({version:2, words:[], tags:[], deletedKeys:[], settings:{sort:'az',pos:'',tag:'',search:''}, translatorUrl:'', appliedDatasets:[]});
+  const initial = () => ({version:2, words:[], tags:[], tagOrders:{}, deletedKeys:[], settings:{sort:'az',pos:'',tag:'',search:''}, translatorUrl:'', appliedDatasets:[]});
   const normalized = x => String(x||'').trim().toLocaleLowerCase('en-US').replace(/\s+/g,' ');
   let sb=null, uid='', email='', syncing=false, dirty=false, authorized=false, pending=null, baseline=initial();
   let debounce=0, loginEpoch=0, lastUser='', refreshing=false, currentStatus='登入中…';
@@ -81,6 +81,7 @@
     return {...initial(),...x,
       words:Array.isArray(x.words)?x.words:[],
       tags:Array.isArray(x.tags)?x.tags:[],
+      tagOrders:x.tagOrders&&typeof x.tagOrders==='object'&&!Array.isArray(x.tagOrders)?x.tagOrders:{},
       deletedKeys:Array.isArray(x.deletedKeys)?x.deletedKeys:[],
       settings:{...initial().settings,...(x.settings||{}),search:''}};
   };
@@ -105,7 +106,7 @@
     const {data:settings,error}=await sb.from('wordbook_settings').select('payload').eq('owner_id',uid).maybeSingle();
     if(error)throw error;
     const payload=settings?.payload||{};
-    return normalizedState({words,tags:payload.tags||[],deletedKeys:payload.deletedKeys||[],
+    return normalizedState({words,tags:payload.tags||[],tagOrders:payload.tagOrders||{},deletedKeys:payload.deletedKeys||[],
       settings:payload.settings||initial().settings,translatorUrl:payload.translatorUrl||''});
   }
   function wordChanges(base,newer){
@@ -123,6 +124,7 @@
     for(const w of changes.upserts)byId.set(String(w.id),w);
     return normalizedState({...remote,words:[...byId.values()],
       tags:local.tags,settings:local.settings,
+      tagOrders:JSON.stringify(local.tagOrders||{})===JSON.stringify(oldBase.tagOrders||{})?remote.tagOrders:local.tagOrders,
       deletedKeys:[...new Set([...(remote.deletedKeys||[]),...(local.deletedKeys||[])])],
       translatorUrl:local.translatorUrl});
   }
@@ -212,7 +214,7 @@
         const {error}=await sb.from('wordbook_entries').delete().eq('owner_id',uid).in('id',deletes.slice(i,i+80));
         if(error)throw error;
       }
-      const payload={tags:current.tags,deletedKeys:current.deletedKeys,
+      const payload={tags:current.tags,tagOrders:current.tagOrders||{},deletedKeys:current.deletedKeys,
         settings:{...current.settings,search:''},translatorUrl:current.translatorUrl};
       const {error}=await sb.from('wordbook_settings').upsert({owner_id:uid,payload,updated_at:new Date().toISOString()},{onConflict:'owner_id'});
       if(error)throw error;
