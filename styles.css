@@ -92,3 +92,24 @@
 .page-jump-shortcuts{display:flex;gap:10px;margin-bottom:8px}
 .page-jump-shortcuts button{flex:1;padding:11px 10px;border-radius:9px;border:1px solid #d9dfce;background:#f2f4e9;color:#596e53;font-size:13px;font-weight:600}
 .page-jump-shortcuts button:focus-visible{outline:2px solid #63785b;outline-offset:2px}
+
+
+/* v3.7: per-tag custom order, zodiac dates and touch-friendly manual sorting */
+.word-date{flex:none;margin-left:9px;color:#a1a99a;font:11px/1.2 Georgia,serif;white-space:nowrap;align-self:center}
+.blank-state{grid-row:1 / -1}
+.tag-order-actions{display:flex;gap:8px;flex:none;align-items:center}
+.tag-order-edit{border:1px solid #ccdac3;background:#eff3e8;border-radius:8px;padding:7px 10px;color:#53734b;font-size:11px}
+.tag-order-edit:focus-visible,.tag-drag-handle:focus-visible,.tag-sort-arrows button:focus-visible{outline:2px solid #72936b;outline-offset:2px}
+.custom-order-switch{display:flex;align-items:center;gap:10px;margin:12px 0 18px;color:#596952;font-size:13px}
+.custom-order-switch input{width:17px;height:17px;accent-color:#63785b;flex:none}
+.tag-order-list{display:flex;flex-direction:column;gap:6px;margin:8px 0 15px}
+.tag-sort-row{display:flex;align-items:center;gap:8px;padding:6px 8px;background:#f7f8f1;border:1px solid #e6e9de;border-radius:10px;min-height:55px;transition:background .1s;position:relative}
+.tag-sort-row.is-dragging{background:#dfe9da;border-color:#a9c79f;box-shadow:0 2px 10px rgba(63,90,59,.13);z-index:2}
+.tag-drag-handle{width:38px;height:43px;display:grid;place-items:center;flex:none;border:0;background:#e9ede4;color:#718268;border-radius:8px;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;cursor:grab;font-size:16px}
+.tag-sort-row.is-dragging .tag-drag-handle{cursor:grabbing}
+.tag-sort-term{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px;line-height:1.2}
+.tag-sort-term b{font-size:14px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tag-sort-term small{font-size:11px;color:#899486;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tag-sort-arrows{display:flex;gap:3px}
+.tag-sort-arrows button{width:26px;height:36px;display:grid;place-items:center;background:#edf0e7;color:#65765f;border:1px solid #e3e9dc;border-radius:7px;font-size:15px;touch-action:manipulation}
+@media(max-width:350px){.word-date{font-size:10px;margin-left:5px}.tag-sort-row{gap:5px;padding:5px}.tag-sort-arrows button{width:25px}}
