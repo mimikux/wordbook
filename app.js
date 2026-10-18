@@ -5,6 +5,26 @@
   // The previous downloaded HTML stored private words at wordbook.local.v1.
   // The HTTPS app never reads that unrelated origin; migrate via the JSON export.
   const PAGE_SIZE=10;
+  // Public reference only. Dates are conventional, cusp days can vary by year.
+  const ZODIAC_DATES=Object.freeze({
+    Capricorn:'12/22–1/19',Aquarius:'1/20–2/18',Pisces:'2/19–3/20',
+    Aries:'3/21–4/19',Taurus:'4/20–5/20',Gemini:'5/21–6/20',
+    Cancer:'6/21–7/22',Leo:'7/23–8/22',Virgo:'8/23–9/22',
+    Libra:'9/23–10/22',Scorpio:'10/23–11/21',Sagittarius:'11/22–12/21'
+  });
+  const TAG_PAGE_SIZES=[6,8,10];
+  function normalizeTagOrders(raw){
+    const entries=raw&&typeof raw==='object'&&!Array.isArray(raw)?Object.entries(raw):[];
+    const result=Object.create(null);
+    for(const [tag,config] of entries){
+      if(!tag||['__proto__','constructor','prototype'].includes(tag)||!config||typeof config!=='object')continue;
+      const ids=Array.isArray(config.order)?config.order.filter(id=>typeof id==='string'&&id.length<220):[];
+      result[tag]={enabled:config.enabled===true,
+        pageSize:TAG_PAGE_SIZES.includes(Number(config.pageSize))?Number(config.pageSize):PAGE_SIZE,
+        showDates:config.showDates===true,order:[...new Set(ids)]};
+    }
+    return result;
+  }
   // Personal-use taxonomy: five frequent parts of speech + one catch-all.
   // Old detailed POS names are kept in posDetails on each word, but displayed,
   // sorted and exported as these six categories. Unknown dictionary labels are
@@ -73,7 +93,7 @@
   const timeNow=()=>new Date().toISOString();
   const escapeHeader=x=>String(x??'').replace(/[\r\n]+/g,' ').slice(0,160);
 
-  function blankState(){return {version:2,words:[],tags:['日常','閱讀','工作','考試'],settings:{sort:'new',tag:'',pos:'',search:''},appliedDatasets:[],deletedKeys:[],translatorUrl:''};}
+  function blankState(){return {version:2,words:[],tags:['日常','閱讀','工作','考試'],tagOrders:{},settings:{sort:'new',tag:'',pos:'',search:''},appliedDatasets:[],deletedKeys:[],translatorUrl:''};}
   function fixWord(w){
     return {id:String(w.id||uuid()),en:clean(w.en),zh:toTraditionalZh(w.zh,w.en),note:String(w.note??w.notes??''),
       pos:posString(w.pos),posDetails:String(w.posDetails??w.posOriginal??w.pos??''),
@@ -376,12 +396,12 @@
   }
   function togglePageSpeech(){
     if(pageSpeech.active){stopPageSpeech();return;}
-    const words=sortedWords().slice(currentPage*PAGE_SIZE,(currentPage+1)*PAGE_SIZE)
+    const words=sortedWords().slice(currentPage*pageSizeForView(),(currentPage+1)*pageSizeForView())
       .filter(w=>clean(w.en)).map(w=>({id:w.id,en:w.en}));
     startPageSpeech(words);
   }
   function showAudioDiagnosis(){
-    const list=sortedWords().slice(currentPage*PAGE_SIZE,(currentPage+1)*PAGE_SIZE);
+    const list=sortedWords().slice(currentPage*pageSizeForView(),(currentPage+1)*pageSizeForView());
     const first=list[0]?.en||'無';const clip=offlineClipFor(first);
     const urlType=location.protocol==='content:'?'Android 下載檔（content://）':location.protocol==='https:'?'HTTPS 網頁':location.protocol==='file:'?'本機檔案':'其他（'+location.protocol+'）';
     const body=`<div class="plain-note">這裡只檢查音訊功能，不會傳送你的單字、標籤或說明。</div>
@@ -426,37 +446,57 @@
     }
     const label=$('#saved-status');if(label)label.textContent=window.WordbookCloud?.isReady?'儲存中…':'尚未登入';
   }
+  function activeTagOrder(){
+    if(!state.settings.tag)return null;
+    const config=state.tagOrders?.[state.settings.tag];
+    return config?.enabled===true?config:null;
+  }
+  function pageSizeForView(){
+    const config=activeTagOrder();
+    return config&&TAG_PAGE_SIZES.includes(Number(config.pageSize))?Number(config.pageSize):PAGE_SIZE;
+  }
   function sortedWords(){
     const q=norm(state.settings.search);
     const list=state.words.filter(w=>hasPosGroup(w,state.settings.pos) && (!state.settings.tag || w.tags.includes(state.settings.tag)) && (!q || norm(w.en).includes(q)||norm(w.zh).includes(q)||norm(w.note).includes(q)));
     const cmp=(a,b)=>a.en.localeCompare(b.en,'en',{sensitivity:'base',numeric:true});
-    const sort=state.settings.sort;
-    if(sort==='az')list.sort(cmp);
-    else if(sort==='za')list.sort((a,b)=>-cmp(a,b));
-    else if(sort==='old')list.sort((a,b)=>safeDate(a.createdAt)-safeDate(b.createdAt)||cmp(a,b));
-    else list.sort((a,b)=>safeDate(b.createdAt)-safeDate(a.createdAt)||cmp(a,b));
+    const config=activeTagOrder();
+    if(config){
+      const index=new Map((config.order||[]).map((id,i)=>[String(id),i]));
+      list.sort((a,b)=>{
+        const ai=index.has(a.id)?index.get(a.id):Infinity;
+        const bi=index.has(b.id)?index.get(b.id):Infinity;
+        return ai-bi||cmp(a,b);
+      });
+    }else{
+      const sort=state.settings.sort;
+      if(sort==='az')list.sort(cmp);
+      else if(sort==='za')list.sort((a,b)=>-cmp(a,b));
+      else if(sort==='old')list.sort((a,b)=>safeDate(a.createdAt)-safeDate(b.createdAt)||cmp(a,b));
+      else list.sort((a,b)=>safeDate(b.createdAt)-safeDate(a.createdAt)||cmp(a,b));
+    }
     return list;
   }
   function render(direction=''){
-    const list=sortedWords(),pages=Math.max(1,Math.ceil(list.length/PAGE_SIZE));
+    const pageSize=pageSizeForView(),list=sortedWords(),pages=Math.max(1,Math.ceil(list.length/pageSize));
     currentPage=Math.max(0,Math.min(currentPage,pages-1));
     if(window.WordbookCloud?.isReady)rememberPage();
-    const offset=currentPage*PAGE_SIZE,slice=list.slice(offset,offset+PAGE_SIZE);
+    const offset=currentPage*pageSize,slice=list.slice(offset,offset+pageSize);
     // Reading is bound to exactly the visible words, not the next page after
     // a swipe, a search, or a change in sort/filter order.
     if(pageSpeech.active&&pageSpeech.signature!==pageSignature(slice))stopPageSpeech();
     let html='';
     if(!list.length){html=`<div class="blank-state"><strong>${state.words.length?'找不到符合的單字':'開始寫下第一個單字'}</strong><small>${state.words.length?'試試不同的搜尋、詞性或標籤':'按右上方 ＋ 新增英文單字'}</small></div>`;}
-    else for(let i=0;i<PAGE_SIZE;i++){
+    else for(let i=0;i<pageSize;i++){
       const w=slice[i];
-      html+=w?`<button class="word-row" data-word-id="${esc(w.id)}" type="button" aria-label="查看 ${esc(w.en)}：${esc(w.zh)}"><span class="line-no">${String(offset+i+1).padStart(2,'0')}</span><span class="word-text"><span class="word-en">${esc(w.en)}</span><span class="word-zh">${esc(w.zh)}</span></span></button>`:
+      html+=w?`<button class="word-row" data-word-id="${esc(w.id)}" type="button" aria-label="查看 ${esc(w.en)}：${esc(w.zh)}"><span class="line-no">${String(offset+i+1).padStart(2,'0')}</span><span class="word-text"><span class="word-en">${esc(w.en)}</span><span class="word-zh">${esc(w.zh)}</span></span>${state.settings.tag==='星座'&&activeTagOrder()?.showDates&&ZODIAC_DATES[w.en]?`<span class="word-date">${esc(ZODIAC_DATES[w.en])}</span>`:''}</button>`:
         `<div class="word-row word-empty"><span class="line-no">${String(offset+i+1).padStart(2,'0')}</span></div>`;
     }
+    $('#word-list').style.gridTemplateRows='repeat('+pageSize+',minmax(0,1fr))';
     $('#word-list').innerHTML=html;
     $('#read-page-btn').disabled=!slice.length;
     updateSpeechButton();
     highlightSpeakingWord();
-    $('#sort-label').textContent=SORTS.find(x=>x[0]===state.settings.sort)?.[1]||SORTS[0][1];
+    $('#sort-label').textContent=activeTagOrder()?'標籤內 · 自訂順序':(SORTS.find(x=>x[0]===state.settings.sort)?.[1]||SORTS[0][1]);
     $('#total-label').textContent=`我的英文單字本 · ${state.words.length} 個單字`;
     $('#page-current').textContent=String(currentPage+1).padStart(2,'0');
     $('#page-total').textContent=String(pages).padStart(2,'0');
@@ -473,11 +513,11 @@
     filter.title=activeParts.join(' · ');
     if(direction){const page=$('#paper-page');page.classList.remove('flip-next','flip-prev');void page.offsetWidth;page.classList.add(direction==='next'?'flip-next':'flip-prev');}
   }
-  function setPage(num){const next=Math.max(0,Math.min(Math.max(0,Math.ceil(sortedWords().length/PAGE_SIZE)-1),num));if(next===currentPage)return;const direction=next>currentPage?'next':'prev';currentPage=next;render(direction);}
+  function setPage(num){const next=Math.max(0,Math.min(Math.max(0,Math.ceil(sortedWords().length/pageSizeForView())-1),num));if(next===currentPage)return;const direction=next>currentPage?'next':'prev';currentPage=next;render(direction);}
   function pageJumpSheet(){
-    const pages=Math.max(1,Math.ceil(sortedWords().length/PAGE_SIZE));
+    const pageSize=pageSizeForView(),pages=Math.max(1,Math.ceil(sortedWords().length/pageSize));
     const here=currentPage+1;
-    const body=`<p class="plain-note">目前第 <b>${here}</b> 頁，共 <b>${pages}</b> 頁，每頁最多 ${PAGE_SIZE} 個單字。可直接輸入頁數或拖曳進度條。</p>
+    const body=`<p class="plain-note">目前第 <b>${here}</b> 頁，共 <b>${pages}</b> 頁，每頁最多 ${pageSize} 個單字。可直接輸入頁數或拖曳進度條。</p>
       <div class="field page-jump-number"><label for="jump-page-number">前往第幾頁</label><input id="jump-page-number" class="text-input" type="number" inputmode="numeric" min="1" max="${pages}" step="1" value="${here}" aria-label="目標頁數"></div>
       <div class="page-jump-slider-row"><span>1</span><input id="jump-page-slider" type="range" min="1" max="${pages}" value="${here}" step="1" aria-label="拖曳選擇頁數" ${pages===1?'disabled':''}><span>${pages}</span></div>
       <div class="page-jump-shortcuts"><button id="jump-first" type="button">第一頁</button><button id="jump-last" type="button">最後一頁</button></div>`;
@@ -981,11 +1021,12 @@
             state.words=state.words.filter(w=>!backupDeleted.has(norm(w.en)));
           }
           state.tags=[...new Set([...state.tags,...data.tags.map(String)])];
+          state.tagOrders={...state.tagOrders,...normalizeTagOrders(data.tagOrders)};
           persist();currentPage=0;render();$('#backup-result').textContent=`合併完成：新增 ${added} 個單字，更新 ${merged} 個既有單字，保留 ${backupDeleted.size} 筆刪除紀錄；Google 收藏和說明保留。`;toast(`舊單字已合併：新增 ${added}、更新 ${merged}`);
         } else {
           if(!confirm(`確定用備份的 ${data.words.length} 個單字取代目前 ${state.words.length} 個單字？新匯入的 Google 收藏及說明會被移除。`))return;
           if(!confirm('再次確認：這是整本取代，請確認已備份目前 Wordbook。'))return;
-          state={...blankState(),...data,version:2,words:data.words.map(fixWord),tags:[...new Set(data.tags.map(String))],settings:{sort:normalizeSort(data.settings?.sort),tag:String(data.settings?.tag||''),pos:POS_GROUPS.some(([key])=>key===data.settings?.pos)?data.settings.pos:'',search:''},appliedDatasets:[CAT.version],deletedKeys:Array.isArray(data.deletedKeys)?data.deletedKeys:[],translatorUrl:String(data.translatorUrl||state.translatorUrl||'')};
+          state={...blankState(),...data,version:2,words:data.words.map(fixWord),tags:[...new Set(data.tags.map(String))],tagOrders:normalizeTagOrders(data.tagOrders||state.tagOrders),settings:{sort:normalizeSort(data.settings?.sort),tag:String(data.settings?.tag||''),pos:POS_GROUPS.some(([key])=>key===data.settings?.pos)?data.settings.pos:'',search:''},appliedDatasets:[CAT.version],deletedKeys:Array.isArray(data.deletedKeys)?data.deletedKeys:[],translatorUrl:String(data.translatorUrl||state.translatorUrl||'')};
           currentPage=0;persist();closeSheet();render();toast(`已取代並還原 ${state.words.length} 個單字`);
         }
       }catch(err){$('#backup-result').textContent=`備份匯入失敗：${err.message}`;toast('備份內容無法匯入');}
@@ -1001,6 +1042,7 @@
       state={...blankState(),...raw,version:2,
         words:Array.isArray(raw.words)?raw.words.filter(w=>w&&typeof w.en==='string').map(fixWord):[],
         tags:Array.isArray(raw.tags)?[...new Set(raw.tags.map(String))]:[],
+        tagOrders:normalizeTagOrders(raw.tagOrders),
         deletedKeys:Array.isArray(raw.deletedKeys)?raw.deletedKeys.map(norm):[],
         settings:{sort:normalizeSort(raw.settings?.sort),tag:String(raw.settings?.tag||''),pos:POS_GROUPS.some(([k])=>k===raw.settings?.pos)?raw.settings.pos:'',search:''},
         translatorUrl:String(raw.translatorUrl||'')};
