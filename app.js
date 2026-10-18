@@ -863,6 +863,104 @@
       state.translatorUrl=url;persist();closeSheet();toast(url?'已儲存 Google 翻譯連線':'已清除翻譯連線');
     }}]);
   }
+  function tagOrderSheet(tag){
+    if(!state.tags.includes(tag))return toast('找不到此標籤');
+    const words=state.words.filter(w=>w.tags.includes(tag));
+    const saved=state.tagOrders?.[tag];
+    const rank=new Map((saved?.order||[]).map((id,i)=>[String(id),i]));
+    words.sort((a,b)=>{
+      const ai=rank.has(a.id)?rank.get(a.id):Infinity;
+      const bi=rank.has(b.id)?rank.get(b.id):Infinity;
+      return ai-bi||a.en.localeCompare(b.en,'en',{sensitivity:'base'});
+    });
+    const defaults={enabled:false,pageSize:PAGE_SIZE,showDates:false,order:words.map(w=>w.id)};
+    const cfg={...defaults,...saved};
+    const body=`<p class="plain-note">只有選擇「${esc(tag)}」標籤時，才使用這裡的順序；全部單字仍維持字母／時間排序。修改會自動同步雲端。</p>
+      <label class="custom-order-switch"><input type="checkbox" id="tag-order-enable" ${cfg.enabled?'checked':''}> 啟用此標籤的自訂排序</label>
+      <div class="field"><label for="tag-order-page-size">這個標籤每頁顯示</label><select id="tag-order-page-size" class="select-input">${TAG_PAGE_SIZES.map(n=>`<option value="${n}" ${Number(cfg.pageSize)===n?'selected':''}>${n} 個單字</option>`).join('')}</select></div>
+      ${tag==='星座'?`<label class="custom-order-switch"><input type="checkbox" id="tag-order-dates" ${cfg.showDates?'checked':''}> 顯示星座日期</label>`:''}
+      <div class="separator-label">自訂順序 · 共 ${words.length} 筆</div>
+      <p class="field-note">長按左邊 ≡ 並上下拖曳，或使用 ↑ ↓ 調整順序。</p>
+      <div id="tag-order-list" class="tag-order-list">${words.map(w=>`<div class="tag-sort-row" data-order-id="${esc(w.id)}">
+        <button class="tag-drag-handle" type="button" aria-label="長按拖曳 ${esc(w.en)}">☰</button>
+        <div class="tag-sort-term"><b>${esc(w.en)}</b><small>${esc(w.zh)}${tag==='星座'&&ZODIAC_DATES[w.en]?' · '+esc(ZODIAC_DATES[w.en]):''}</small></div>
+        <div class="tag-sort-arrows"><button type="button" data-move="-1" aria-label="${esc(w.en)} 上移">↑</button><button type="button" data-move="1" aria-label="${esc(w.en)} 下移">↓</button></div>
+      </div>`).join('')}</div>
+      ${words.length?'':'<div class="empty-inline">先把單字加入此標籤，就可以調整順序。</div>'}`;
+    openSheet('標籤排序 · '+tag,body,[
+      {text:'返回標籤管理',kind:'btn-ghost',action:tagManager},
+      {text:'查看此標籤',kind:'btn-primary',action:()=>{
+        state.settings.tag=tag;
+        state.settings.pos='';state.settings.search='';currentPage=0;
+        persist();closeSheet();render();
+      }}
+    ],{tall:true});
+    const list=$('#tag-order-list');
+    const update=patch=>{
+      state.tagOrders={...state.tagOrders,[tag]:{...cfg,...(state.tagOrders[tag]||{}),...patch}};
+      persist();render();
+    };
+    const saveOrder=()=>update({enabled:true,order:$('[data-order-id]',list).map(row=>row.dataset.orderId)});
+    $('#tag-order-enable').onchange=e=>{update({enabled:e.target.checked});};
+    $('#tag-order-page-size').onchange=e=>update({pageSize:Number(e.target.value)});
+    if($('#tag-order-dates'))$('#tag-order-dates').onchange=e=>update({showDates:e.target.checked});
+    list.addEventListener('click',e=>{
+      const btn=e.target.closest('[data-move]'),row=btn?.closest('[data-order-id]');
+      if(!row)return;
+      const rows=$('[data-order-id]',list),i=rows.indexOf(row),n=i+Number(btn.dataset.move);
+      if(n<0||n>=rows.length)return;
+      if(n<i)list.insertBefore(row,rows[n]);
+      else list.insertBefore(row,rows[n].nextSibling);
+      saveOrder();
+      $('#tag-order-enable').checked=true;
+    });
+    let timer=0,row=null,startY=0,dragging=false;
+    const reset=()=>{
+      clearTimeout(timer);
+      if(row)row.classList.remove('is-dragging');
+      row=null;dragging=false;
+    };
+    list.addEventListener('pointerdown',e=>{
+      const handle=e.target.closest('.tag-drag-handle'),target=handle?.closest('[data-order-id]');
+      if(!target||e.button!==0||row)return;
+      row=target;startY=e.clientY;
+      try{handle.setPointerCapture(e.pointerId);}catch(_){}
+      timer=setTimeout(()=>{
+        if(!row)return;
+        dragging=true;row.classList.add('is-dragging');
+        if(navigator.vibrate)navigator.vibrate(15);
+      },330);
+    });
+    list.addEventListener('pointermove',e=>{
+      if(!row)return;
+      if(!dragging){
+        if(Math.abs(e.clientY-startY)>12)reset();
+        return;
+      }
+      e.preventDefault();
+      const target=document.elementFromPoint(e.clientX,e.clientY)?.closest('[data-order-id]');
+      if(target&&target!==row&&list.contains(target)){
+        const r=target.getBoundingClientRect();
+        if(e.clientY<r.top+r.height/2)list.insertBefore(row,target);
+        else list.insertBefore(row,target.nextSibling);
+      }
+      const scroller=list.closest('.sheet-content');
+      if(scroller){
+        const r=scroller.getBoundingClientRect();
+        if(e.clientY<r.top+36)scroller.scrollBy(0,-10);
+        else if(e.clientY>r.bottom-36)scroller.scrollBy(0,10);
+      }
+    });
+    const finish=()=>{
+      const wasDragging=dragging;
+      reset();
+      if(wasDragging){saveOrder();$('#tag-order-enable').checked=true;toast('標籤排序已儲存');}
+    };
+    list.addEventListener('pointerup',finish);
+    list.addEventListener('pointercancel',reset);
+    list.addEventListener('lostpointercapture',()=>{if(dragging)finish();else reset();});
+    list.addEventListener('contextmenu',e=>{if(e.target.closest('.tag-drag-handle'))e.preventDefault();});
+  }
   function tagManager(){
     const content=`<div class="field"><label for="new-tag">新增分類名稱</label><div class="inline-actions"><input id="new-tag" class="text-input" maxlength="24" placeholder="例如：旅遊、商務、片語"><button id="tag-add" class="btn btn-primary" type="button">新增</button></div></div><div class="separator-label">目前分類</div>${state.tags.length?state.tags.map(t=>`<div class="tag-manage-row"><div><b>${esc(t)}</b> <small>· ${state.words.filter(w=>w.tags.includes(t)).length} 個單字${state.tagOrders?.[t]?.enabled?' · 自訂排序':''}</small></div><div class="tag-order-actions"><button class="tag-order-edit" type="button" data-order-tag="${esc(t)}">排序</button><button class="remove-mini" type="button" data-delete-tag="${esc(t)}">刪除</button></div></div>`).join(''):'<p class="empty-inline">沒有分類</p>'}<p class="field-note">刪除分類不會刪除單字。</p>`;
     openSheet('管理分類標籤',content,[{text:'完成',kind:'btn-primary',action:closeSheet}]);
