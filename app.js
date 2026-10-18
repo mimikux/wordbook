@@ -151,6 +151,7 @@
   const forgetPage=()=>{try{sessionStorage.removeItem(PAGE_POSITION_KEY);}catch(e){}};
   let restorePageOnLogin=true;
   let currentPage=0,touchStart=null,toastTimer=0,savedOk=true,activeSheet='';
+  let searchOriginPage=null,highlightedWordId='';
   // v2.1.9: Android downloaded HTML often has an opaque content:// origin.
   // Prefer direct WebAudio buffer output over MP3 data: URLs via HTMLAudioElement.
   // On a real user click, resume AudioContext synchronously; decode/play offline
@@ -455,11 +456,16 @@
     const config=activeTagOrder();
     return config&&TAG_PAGE_SIZES.includes(Number(config.pageSize))?Number(config.pageSize):PAGE_SIZE;
   }
-  function sortedWords(){
-    const q=norm(state.settings.search);
-    const list=state.words.filter(w=>hasPosGroup(w,state.settings.pos) && (!state.settings.tag || w.tags.includes(state.settings.tag)) && (!q || norm(w.en).includes(q)||norm(w.zh).includes(q)||norm(w.note).includes(q)));
+  function sortedWords(overrides={}){
+    // Overrides are used only to calculate a word's position in the
+    // complete notebook. The current tag/search filters remain untouched.
+    const query=overrides.search===undefined?state.settings.search:overrides.search;
+    const tag=overrides.tag===undefined?state.settings.tag:overrides.tag;
+    const pos=overrides.pos===undefined?state.settings.pos:overrides.pos;
+    const q=norm(query);
+    const list=state.words.filter(w=>hasPosGroup(w,pos) && (!tag || w.tags.includes(tag)) && (!q || norm(w.en).includes(q)||norm(w.zh).includes(q)||norm(w.note).includes(q)));
     const cmp=(a,b)=>a.en.localeCompare(b.en,'en',{sensitivity:'base',numeric:true});
-    const config=activeTagOrder();
+    const config=tag&&state.tagOrders?.[tag]?.enabled===true?state.tagOrders[tag]:null;
     if(config){
       const index=new Map((config.order||[]).map((id,i)=>[String(id),i]));
       list.sort((a,b)=>{
@@ -476,6 +482,35 @@
     }
     return list;
   }
+  function fullBookPages(){
+    return new Map(sortedWords({search:'',tag:'',pos:''}).map((w,i)=>[w.id,Math.floor(i/PAGE_SIZE)+1]));
+  }
+  function clearSearchAndRestore(){
+    if(!state.settings.search)return;
+    state.settings.search='';
+    currentPage=searchOriginPage??0;
+    searchOriginPage=null;
+    highlightedWordId='';
+    render();
+  }
+  function jumpToWordInBook(id){
+    const all=sortedWords({search:'',tag:'',pos:''});
+    const at=all.findIndex(w=>w.id===id);
+    if(at<0){toast('這個單字已不存在，請重新搜尋');return false;}
+    const hadFilters=!!(state.settings.tag||state.settings.pos);
+    state.settings.search='';
+    state.settings.tag='';
+    state.settings.pos='';
+    searchOriginPage=null;
+    highlightedWordId=id;
+    const targetPage=Math.floor(at/PAGE_SIZE);
+    currentPage=targetPage;
+    closeSheet();
+    if(hadFilters)persist();
+    render();
+    toast('已前往「'+all[at].en+'」· 第 '+(targetPage+1)+' 頁',4500);
+    return true;
+  }
   function render(direction=''){
     const pageSize=pageSizeForView(),list=sortedWords(),pages=Math.max(1,Math.ceil(list.length/pageSize));
     currentPage=Math.max(0,Math.min(currentPage,pages-1));
@@ -484,12 +519,22 @@
     // Reading is bound to exactly the visible words, not the next page after
     // a swipe, a search, or a change in sort/filter order.
     if(pageSpeech.active&&pageSpeech.signature!==pageSignature(slice))stopPageSpeech();
+    const fullPages=state.settings.search?fullBookPages():null;
     let html='';
-    if(!list.length){html=`<div class="blank-state"><strong>${state.words.length?'找不到符合的單字':'開始寫下第一個單字'}</strong><small>${state.words.length?'試試不同的搜尋、詞性或標籤':'按右上方 ＋ 新增英文單字'}</small></div>`;}
-    else for(let i=0;i<pageSize;i++){
+    if(!list.length){
+      html=`<div class="blank-state"><strong>${state.words.length?'找不到符合的單字':'開始寫下第一個單字'}</strong><small>${state.words.length?'試試不同的搜尋、詞性或標籤':'按右上方 ＋ 新增英文單字'}</small></div>`;
+    }else for(let i=0;i<pageSize;i++){
       const w=slice[i];
-      html+=w?`<button class="word-row" data-word-id="${esc(w.id)}" type="button" aria-label="查看 ${esc(w.en)}：${esc(w.zh)}"><span class="line-no">${String(offset+i+1).padStart(2,'0')}</span><span class="word-text"><span class="word-en">${esc(w.en)}</span><span class="word-zh">${esc(w.zh)}</span></span>${state.settings.tag==='星座'&&activeTagOrder()?.showDates&&ZODIAC_DATES[w.en]?`<span class="word-date">${esc(ZODIAC_DATES[w.en])}</span>`:''}</button>`:
-        `<div class="word-row word-empty"><span class="line-no">${String(offset+i+1).padStart(2,'0')}</span></div>`;
+      if(!w){
+        html+=`<div class="word-row word-empty"><span class="line-no">${String(offset+i+1).padStart(2,'0')}</span></div>`;
+        continue;
+      }
+      const selected=highlightedWordId===w.id?' word-jump-highlight':'';
+      const item=`<button class="word-row${selected}" data-word-id="${esc(w.id)}" type="button" aria-label="查看 ${esc(w.en)}：${esc(w.zh)}"><span class="line-no">${String(offset+i+1).padStart(2,'0')}</span><span class="word-text"><span class="word-en">${esc(w.en)}</span><span class="word-zh">${esc(w.zh)}</span></span>${state.settings.tag==='星座'&&activeTagOrder()?.showDates&&ZODIAC_DATES[w.en]?`<span class="word-date">${esc(ZODIAC_DATES[w.en])}</span>`:''}</button>`;
+      const sourcePage=fullPages?.get(w.id);
+      html+=fullPages&&sourcePage
+        ?`<div class="search-result-wrap">${item}<button class="search-result-goto" data-goto-word="${esc(w.id)}" type="button" aria-label="前往 ${esc(w.en)} 在完整單字本第 ${sourcePage} 頁">原頁 ${sourcePage} ↗</button></div>`
+        :item;
     }
     $('#word-list').style.gridTemplateRows='repeat('+pageSize+',minmax(0,1fr))';
     $('#word-list').innerHTML=html;
@@ -507,13 +552,14 @@
     const activeParts=[];
     if(state.settings.pos)activeParts.push('詞性：'+(POS_GROUPS.find(([key])=>key===state.settings.pos)?.[1]||'其他'));
     if(state.settings.tag)activeParts.push('# '+state.settings.tag);
-    if(state.settings.search)activeParts.push('搜尋中');
+    if(state.settings.search)activeParts.push('搜尋：'+state.settings.search);
     filter.hidden=!activeParts.length;
-    filter.textContent=activeParts.join(' · ');
+    $('#active-filter-text').textContent=activeParts.join(' · ');
+    $('#clear-search-btn').hidden=!state.settings.search;
     filter.title=activeParts.join(' · ');
     if(direction){const page=$('#paper-page');page.classList.remove('flip-next','flip-prev');void page.offsetWidth;page.classList.add(direction==='next'?'flip-next':'flip-prev');}
   }
-  function setPage(num){const next=Math.max(0,Math.min(Math.max(0,Math.ceil(sortedWords().length/pageSizeForView())-1),num));if(next===currentPage)return;const direction=next>currentPage?'next':'prev';currentPage=next;render(direction);}
+  function setPage(num){const next=Math.max(0,Math.min(Math.max(0,Math.ceil(sortedWords().length/pageSizeForView())-1),num));if(next===currentPage)return;const direction=next>currentPage?'next':'prev';highlightedWordId='';currentPage=next;render(direction);}
   function pageJumpSheet(){
     const pageSize=pageSizeForView(),pages=Math.max(1,Math.ceil(sortedWords().length/pageSize));
     const here=currentPage+1;
@@ -722,9 +768,47 @@
     if($('#selected-tag-order'))$('#selected-tag-order').onclick=()=>tagOrderSheet(state.settings.tag);
   }
   function searchSheet(){
-    const body=`<div class="field"><label for="search-text">搜尋英文、中文或說明</label><input id="search-text" type="search" class="text-input" value="${esc(state.settings.search||'')}" placeholder="例如 pawn / 被人利用" autocomplete="off"></div><p class="field-note">說明欄平時不顯示，但內容也可以被搜尋到。</p>`;
-    openSheet('搜尋單字',body,[{text:'清除搜尋',kind:'btn-ghost',action:()=>{state.settings.search='';currentPage=0;closeSheet();render();}},{text:'搜尋',kind:'btn-primary',action:()=>{state.settings.search=clean($('#search-text').value);currentPage=0;closeSheet();render();}}],{autofocus:'#search-text'});
-    $('#search-text').onkeydown=e=>{if(e.key==='Enter')$('#modal-action-1').click();};
+    const body=`<div class="field"><label for="search-text">搜尋英文、中文或說明</label>
+      <input id="search-text" type="search" class="text-input" value="${esc(state.settings.search||'')}" placeholder="例如 silver-tongued" autocomplete="off"></div>
+      <div class="separator-label">快速前往完整單字本</div>
+      <div id="search-quick-results" class="search-quick-results" aria-live="polite"></div>
+      <p class="field-note">點選下方的單字可直接跳到原始頁數；選「搜尋」則只顯示符合的結果。說明欄也會納入比對。</p>`;
+    openSheet('搜尋單字',body,[
+      {text:'清除搜尋',kind:'btn-ghost',action:()=>{closeSheet();clearSearchAndRestore();}},
+      {text:'搜尋',kind:'btn-primary',action:()=>{
+        const value=clean($('#search-text').value);
+        if(value&&!state.settings.search)searchOriginPage=currentPage;
+        state.settings.search=value;
+        highlightedWordId='';
+        if(value)currentPage=0;
+        else{currentPage=searchOriginPage??currentPage;searchOriginPage=null;}
+        closeSheet();render();
+      }}
+    ],{autofocus:'#search-text'});
+    const input=$('#search-text'),suggestions=$('#search-quick-results');
+    const refreshSuggestions=()=>{
+      if(!suggestions?.isConnected)return;
+      const query=clean(input.value);
+      if(!query){
+        suggestions.innerHTML='<p class="search-quick-empty">輸入英文或中文，即可顯示相符單字的原始頁碼。</p>';
+        return;
+      }
+      const matches=sortedWords({search:query,tag:'',pos:''});
+      if(!matches.length){
+        suggestions.innerHTML='<p class="search-quick-empty">找不到符合的單字</p>';
+        return;
+      }
+      const pages=fullBookPages();
+      const rows=matches.slice(0,8).map(w=>{
+        const page=pages.get(w.id)||1;
+        return `<button class="search-quick-item" type="button" data-quick-goto="${esc(w.id)}" aria-label="前往 ${esc(w.en)}，完整單字本第 ${page} 頁"><span class="search-quick-word"><strong>${esc(w.en)}</strong><small>${esc(w.zh)}</small></span><span class="search-quick-page">第 ${page} 頁 ↗</span></button>`;
+      }).join('');
+      suggestions.innerHTML=`<div class="search-quick-count">符合 ${matches.length} 筆${matches.length>8?' · 顯示前 8 筆':''}</div>${rows}`;
+      $$('[data-quick-goto]',suggestions).forEach(button=>button.onclick=()=>jumpToWordInBook(button.dataset.quickGoto));
+    };
+    input.addEventListener('input',refreshSuggestions);
+    input.onkeydown=e=>{if(e.key==='Enter'){$('#modal-action-1').click();}};
+    refreshSuggestions();
   }
   // User-initiated, resumable enrichment; no AI keys and no automatic mass requests.
   let bulkRun=null;
@@ -1145,14 +1229,14 @@
         tags:Array.isArray(raw.tags)?[...new Set(raw.tags.map(String))]:[],
         tagOrders:normalizeTagOrders(raw.tagOrders),
         deletedKeys:Array.isArray(raw.deletedKeys)?raw.deletedKeys.map(norm):[],
-        settings:{sort:normalizeSort(raw.settings?.sort),tag:String(raw.settings?.tag||''),pos:POS_GROUPS.some(([k])=>k===raw.settings?.pos)?raw.settings.pos:'',search:''},
+        settings:{sort:normalizeSort(raw.settings?.sort),tag:String(raw.settings?.tag||''),pos:POS_GROUPS.some(([k])=>k===raw.settings?.pos)?raw.settings.pos:'',search:restorePageOnLogin?'':state.settings.search},
         translatorUrl:String(raw.translatorUrl||'')};
-      if(restorePageOnLogin){currentPage=readStoredPage();restorePageOnLogin=false;}
+      if(restorePageOnLogin){currentPage=readStoredPage();searchOriginPage=null;highlightedWordId='';restorePageOnLogin=false;}
       // Background cloud refresh preserves the currently visible page.
       render();
     },
     notify:toast,
-    hide:()=>{if(pageSpeech.active)stopPageSpeech();state=blankState();currentPage=0;restorePageOnLogin=true;forgetPage();render();},
+    hide:()=>{if(pageSpeech.active)stopPageSpeech();state=blankState();currentPage=0;searchOriginPage=null;highlightedWordId='';restorePageOnLogin=true;forgetPage();render();},
     setStatus:(message)=>{const el=$('#saved-status');if(el)el.textContent=message;},
     promptImport:()=>{restoreSheet();}
   });
@@ -1164,9 +1248,10 @@
   $('#page-jump-btn').onclick=pageJumpSheet;
   $('#add-btn').onclick=()=>wordEditor();
   $('#search-btn').onclick=searchSheet;
+  $('#clear-search-btn').onclick=clearSearchAndRestore;
   $('#sort-btn').onclick=sortSheet;
   $('#more-btn').onclick=moreSheet;
-  $('#word-list').onclick=e=>{const item=e.target.closest('[data-word-id]');if(item)wordEditor(item.dataset.wordId);};
+  $('#word-list').onclick=e=>{const goto=e.target.closest('[data-goto-word]');if(goto){jumpToWordInBook(goto.dataset.gotoWord);return;}const item=e.target.closest('[data-word-id]');if(item)wordEditor(item.dataset.wordId);};
   document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('#modal-layer').hidden){closeSheet();return;}if(!$('#modal-layer').hidden||/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName||''))return;if(e.key==='ArrowLeft')setPage(currentPage-1);if(e.key==='ArrowRight')setPage(currentPage+1);});
   const paper=$('#paper-page');
   paper.addEventListener('pointerdown',e=>{if(e.isPrimary)touchStart={x:e.clientX,y:e.clientY};});
