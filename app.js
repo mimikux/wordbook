@@ -514,7 +514,7 @@
   function render(direction=''){
     const pageSize=pageSizeForView(),list=sortedWords(),pages=Math.max(1,Math.ceil(list.length/pageSize));
     currentPage=Math.max(0,Math.min(currentPage,pages-1));
-    if(window.WordbookCloud?.isReady)rememberPage();
+    if(window.WordbookCloud?.isReady&&!state.settings.search)rememberPage();
     const offset=currentPage*pageSize,slice=list.slice(offset,offset+pageSize);
     // Reading is bound to exactly the visible words, not the next page after
     // a swipe, a search, or a change in sort/filter order.
