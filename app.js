@@ -563,8 +563,7 @@
   function pageJumpSheet(){
     const pageSize=pageSizeForView(),pages=Math.max(1,Math.ceil(sortedWords().length/pageSize));
     const here=currentPage+1;
-    const body=`<p class="plain-note">目前第 <b>${here}</b> 頁，共 <b>${pages}</b> 頁，每頁最多 ${pageSize} 個單字。可直接輸入頁數或拖曳進度條。</p>
-      <div class="field page-jump-number"><label for="jump-page-number">前往第幾頁</label><input id="jump-page-number" class="text-input" type="number" inputmode="numeric" min="1" max="${pages}" step="1" value="${here}" aria-label="目標頁數"></div>
+    const body=`<div class="field page-jump-number"><label for="jump-page-number">前往第幾頁</label><input id="jump-page-number" class="text-input" type="number" inputmode="numeric" min="1" max="${pages}" step="1" value="${here}" aria-label="目標頁數"></div>
       <div class="page-jump-slider-row"><span>1</span><input id="jump-page-slider" type="range" min="1" max="${pages}" value="${here}" step="1" aria-label="拖曳選擇頁數" ${pages===1?'disabled':''}><span>${pages}</span></div>
       <div class="page-jump-shortcuts"><button id="jump-first" type="button">第一頁</button><button id="jump-last" type="button">最後一頁</button></div>`;
     openSheet('快速跳頁',body,[{text:'取消',kind:'btn-ghost',action:closeSheet},{text:'前往此頁',kind:'btn-primary',action:()=>jump($('#jump-page-number').value)}]);
