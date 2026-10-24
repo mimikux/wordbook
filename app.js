@@ -97,7 +97,7 @@
   function fixWord(w){
     return {id:String(w.id||uuid()),en:clean(w.en),zh:toTraditionalZh(w.zh,w.en),note:String(w.note??w.notes??''),
       pos:posString(w.pos),posDetails:String(w.posDetails??w.posOriginal??w.pos??''),
-      posSource:String(w.posSource|| (w.pos?'legacy':'') ),tags:Array.isArray(w.tags)?w.tags.map(String):[],source:String(w.source||''),
+      posSource:String(w.posSource?? (w.pos?'legacy':'') ),tags:Array.isArray(w.tags)?w.tags.map(String):[],source:String(w.source||''),
       originals:Array.isArray(w.originals)?w.originals:[],createdAt:w.createdAt||timeNow(),updatedAt:w.updatedAt||w.createdAt||timeNow()};
   }
   function loadRaw(){return blankState();} // Cloud version: never auto-import legacy browser data.
@@ -673,6 +673,7 @@
     });
     const autoLookup=async(id,en)=>{
       if(!valid(id,en))return;
+      if(navigator.onLine===false){busy(false);return;}
       const jobs=[];
       if(!zhEdited&&!clean(zhInput.value)&&state.translatorUrl){
         status.textContent='正在取得 Google 中文…';
@@ -707,6 +708,14 @@
       if(autoFilledPos.length&&!posEdited){changePos([]);autoFilledPos=[];lookupPosSource='';}
       const en=currentEnglish();
       if(word||en.length<2||!/[a-z]/i.test(en)){busy(false);return;}
+      if(navigator.onLine===false){
+        // Automatic dictionary/Google lookups require connectivity, but must
+        // never prevent saving a new word during a flight.
+        busy(false);
+        status.textContent='離線模式：請先手動填入中文，連線後可再查詢。';
+        posStatus.textContent='離線模式：詞性可手動選擇。';
+        return;
+      }
       const id=lookupSerial;busy(true);autoTimer=setTimeout(()=>autoLookup(id,en),650);
     };
 
